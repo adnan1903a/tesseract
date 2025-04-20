@@ -1,0 +1,73 @@
+import pytesseract
+import pyautogui
+import cv2
+import numpy as np
+from PIL import ImageGrab
+import time
+
+# OCR için tesseract yolu (bunu kendi sistemine göre güncelle)
+pytesseract.pytesseract.tesseract_cmd = r"C:\Program Files\Tesseract-OCR\tesseract.exe"
+
+# Koordinatları senin ekranına göre ayarla
+RSI_REGION = (100, 200, 200, 230)  # RSI yazısının olduğu yerin ekran koordinatları
+MACD_REGION = (100, 250, 200, 280) # MACD histogram kısmı
+PRICE_REGION = (500, 400, 600, 420)  # Bollinger konumu belirlemek için
+
+UP_BUTTON = (1230, 540)
+DOWN_BUTTON = (1230, 600)
+
+def get_text_from_region(region):
+    img = ImageGrab.grab(bbox=region)
+    img = cv2.cvtColor(np.array(img), cv2.COLOR_BGR2GRAY)
+    text = pytesseract.image_to_string(img, config='--psm 7')
+    return text.strip()
+
+def place_trade(direction):
+    if direction == 'UP':
+        pyautogui.moveTo(UP_BUTTON[0], UP_BUTTON[1], duration=0.1)
+        pyautogui.click()
+        print("YUKARI işlem açıldı")
+    elif direction == 'DOWN':
+        pyautogui.moveTo(DOWN_BUTTON[0], DOWN_BUTTON[1], duration=0.1)
+        pyautogui.click()
+        print("AŞAĞI işlem açıldı")
+
+def parse_float(text):
+    try:
+        return float(text.replace(",", "."))
+    except:
+        return None
+
+while True:
+    try:
+        rsi_text = get_text_from_region(RSI_REGION)
+        macd_text = get_text_from_region(MACD_REGION)
+
+        rsi = parse_float(rsi_text)
+        macd = parse_float(macd_text)
+
+        print(f"RSI: {rsi}, MACD: {macd}")
+
+        # Bollinger Band bölgesi basit: fiyat alt çizgiye yakın mı
+        price_text = get_text_from_region(PRICE_REGION)
+        price = parse_float(price_text)
+
+        if rsi is None or macd is None:
+            print("Veri okunamadı, bekleniyor...")
+            time.sleep(2)
+            continue
+
+        # AL
+        if rsi < 30 and macd > 0:
+            place_trade("UP")
+        # SAT
+        elif rsi > 70 and macd < 0:
+            place_trade("DOWN")
+        else:
+            print("Sinyal yok, bekleniyor...")
+
+        time.sleep(5)
+
+    except Exception as e:
+        print(f"HATA: {e}")
+        time.sleep(3)
